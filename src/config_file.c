@@ -393,8 +393,10 @@ static int config_set(git_config_backend *cfg, const char *name, const char *val
 
 	git__free(esc_value);
 	git_strmap_insert2(b->values, key, var, old_var, rval);
-	if (rval < 0)
+	if (rval < 0) {
+		cvar_free(var);
 		return -1;
+	}
 	if (old_var != NULL)
 		cvar_free(old_var);
 
@@ -1073,6 +1075,7 @@ static int config_parse(diskfile_backend *cfg_file, struct reader *reader, git_c
 			git__free(var_name);
 
 			if (git_buf_oom(&buf)) {
+				cvar_free(var);
 				git__free(var_value);
 				return -1;
 			}
