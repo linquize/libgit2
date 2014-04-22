@@ -186,14 +186,21 @@ bool git_buf_text_is_binary(const git_buf *buf)
 	while (scan < end) {
 		unsigned char c = *scan++;
 
-		if (c > 0x1F && c < 0x7F)
+		/* non-control ASCII chars, not DEL, non-ASCII, BS, HT, ESC, FF are printable */
+		if ((c > 0x1F && c < 0x7F) || c > 0x7F
+			|| c == '\b' || c == '\t' || c == '\033' || c == '\014')
 			printable++;
+		/* NUL means binary file */
 		else if (c == '\0')
 			return true;
-		else if (!git__isspace(c))
+		/* Control chars and DEL are nonprintable; CR, LF are not counted */
+		else if ((c < 0x20 || c == 0x7F) && c != '\r' && c != '\n')
 			nonprintable++;
 	}
 
+	/* Do not treat EOF char at the end of file as nonprintable */
+	if (buf->size > 0 && *(end - 1) == '\032')
+		nonprintable--;
 	return ((printable >> 7) < nonprintable);
 }
 
