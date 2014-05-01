@@ -16,6 +16,8 @@
 #include "filter.h"
 #include "buf_text.h"
 
+size_t git_blob__binary_detect_size = 4000;
+
 const void *git_blob_rawcontent(const git_blob *blob)
 {
 	assert(blob);
@@ -333,7 +335,7 @@ int git_blob_is_binary(const git_blob *blob)
 	assert(blob);
 
 	content.ptr   = blob->odb_object->buffer;
-	content.size  = min(blob->odb_object->cached.size, 4000);
+	content.size  = min(blob->odb_object->cached.size, git_blob__binary_detect_size);
 	content.asize = 0;
 
 	return git_buf_text_is_binary(&content);

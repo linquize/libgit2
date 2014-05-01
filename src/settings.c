@@ -9,6 +9,7 @@
 #include "common.h"
 #include "sysdir.h"
 #include "cache.h"
+#include "blob.h"
 
 void git_libgit2_version(int *major, int *minor, int *rev)
 {
@@ -130,6 +131,14 @@ int git_libgit2_opts(int key, ...)
 
 	case GIT_OPT_SET_TEMPLATE_PATH:
 		error = git_sysdir_set(GIT_SYSDIR_TEMPLATE, va_arg(ap, const char *));
+		break;
+
+	case GIT_OPT_GET_BINARY_DETECT_SIZE:
+		*(va_arg(ap, size_t *)) = git_blob__binary_detect_size;
+		break;
+
+	case GIT_OPT_SET_BINARY_DETECT_SIZE:
+		git_blob__binary_detect_size = va_arg(ap, size_t);
 		break;
 	}
 

@@ -136,7 +136,9 @@ typedef enum {
 	GIT_OPT_ENABLE_CACHING,
 	GIT_OPT_GET_CACHED_MEMORY,
 	GIT_OPT_GET_TEMPLATE_PATH,
-	GIT_OPT_SET_TEMPLATE_PATH
+	GIT_OPT_SET_TEMPLATE_PATH,
+	GIT_OPT_GET_BINARY_DETECT_SIZE,
+	GIT_OPT_SET_BINARY_DETECT_SIZE
 } git_libgit2_opt_t;
 
 /**
@@ -220,6 +222,17 @@ typedef enum {
  *		> Set the default template path.
  *		>
  *		> - `path` directory of template.
+ *
+ *	* opts(GIT_OPT_GET_BINARY_DETECT_SIZE, size_t *out)
+ *
+ *		> Get the size used in binary detection
+ *		> The size is written to the `out` pointer.
+ *
+ *	* opts(GIT_OPT_SET_BINARY_DETECT_SIZE, size_t *size)
+ *
+ *		> Set the size used in binary detection.
+ *		>
+ *		> - `size` number of bytes.
  *
  * @param option Option key
  * @param ... value to set the option
