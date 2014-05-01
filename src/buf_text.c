@@ -253,7 +253,8 @@ int git_buf_text_detect_bom(git_bom_t *bom, const git_buf *buf, size_t offset)
 }
 
 bool git_buf_text_gather_stats(
-	git_buf_text_stats *stats, const git_buf *buf, bool skip_bom)
+	git_buf_text_stats *stats, const git_buf *buf, bool skip_bom,
+	bool binary_only)
 {
 	const char *scan = buf->ptr, *end = buf->ptr + buf->size;
 	int skip;
@@ -277,6 +278,8 @@ bool git_buf_text_gather_stats(
 			stats->printable++;
 		else switch (c) {
 			case '\0':
+				if (binary_only)
+					return true;
 				stats->nul++;
 				stats->nonprintable++;
 				break;

@@ -135,7 +135,7 @@ static int crlf_apply_to_odb(
 		git_buf_text_stats stats;
 
 		/* Check heuristics for binary vs text - returns true if binary */
-		if (git_buf_text_gather_stats(&stats, from, false))
+		if (git_buf_text_gather_stats(&stats, from, false, false))
 			return GIT_PASSTHROUGH;
 
 		/* If safecrlf is enabled, sanity-check the result. */

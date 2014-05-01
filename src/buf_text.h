@@ -114,9 +114,11 @@ extern int git_buf_text_detect_bom(
  * @param stats Structure to be filled in
  * @param buf Text to process
  * @param skip_bom Exclude leading BOM from stats if true
+ * @param binary_only Only check if it is binary without filling stats if true
  * @return Does the buffer heuristically look like binary data
  */
 extern bool git_buf_text_gather_stats(
-	git_buf_text_stats *stats, const git_buf *buf, bool skip_bom);
+	git_buf_text_stats *stats, const git_buf *buf, bool skip_bom,
+	bool binary_only);
 
 #endif
