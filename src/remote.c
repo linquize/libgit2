@@ -314,7 +314,7 @@ struct refspec_cb_data {
 static int refspec_cb(const git_config_entry *entry, void *payload)
 {
 	struct refspec_cb_data *data = (struct refspec_cb_data *)payload;
-	return add_refspec(data->remote, entry->value, data->fetch);
+	return add_refspec(data->remote, entry->value, (bool)data->fetch);
 }
 
 static int get_optional_config(
@@ -1672,7 +1672,7 @@ int git_remote_add_push(git_remote *remote, const char *refspec)
 	return add_and_dwim(remote, refspec, true);
 }
 
-static int set_refspecs(git_remote *remote, git_strarray *array, int push)
+static int set_refspecs(git_remote *remote, git_strarray *array, unsigned int push)
 {
 	git_vector *vec = &remote->refspecs;
 	git_refspec *spec;
