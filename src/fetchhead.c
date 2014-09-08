@@ -112,23 +112,26 @@ int git_fetchhead_write(git_repository *repo, git_vector *fetchhead_refs)
 	git_buf path = GIT_BUF_INIT;
 	unsigned int i;
 	git_fetchhead_ref *fetchhead_ref;
+	int flags = (fetchhead_refs != NULL ? GIT_FILEBUF_APPEND : 0) | GIT_FILEBUF_FORCE;
 
-	assert(repo && fetchhead_refs);
+	assert(repo);
 
 	if (git_buf_joinpath(&path, repo->path_repository, GIT_FETCH_HEAD_FILE) < 0)
 		return -1;
 
-	if (git_filebuf_open(&file, path.ptr, GIT_FILEBUF_FORCE, GIT_REFS_FILE_MODE) < 0) {
+	if (git_filebuf_open(&file, path.ptr, flags, GIT_REFS_FILE_MODE) < 0) {
 		git_buf_free(&path);
 		return -1;
 	}
 
 	git_buf_free(&path);
 
-	git_vector_sort(fetchhead_refs);
+	if (fetchhead_refs != NULL) {
+		git_vector_sort(fetchhead_refs);
 
-	git_vector_foreach(fetchhead_refs, i, fetchhead_ref)
-		fetchhead_ref_write(&file, fetchhead_ref);
+		git_vector_foreach(fetchhead_refs, i, fetchhead_ref)
+			fetchhead_ref_write(&file, fetchhead_ref);
+	}
 
 	return git_filebuf_commit(&file);
 }
