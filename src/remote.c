@@ -944,6 +944,7 @@ static int git_remote_write_fetchhead(git_remote *remote, git_refspec *spec, git
 	bool include_all_fetchheads;
 	unsigned int i = 0;
 	int error = 0;
+	char *url = NULL;
 
 	assert(remote);
 
@@ -968,6 +969,9 @@ static int git_remote_write_fetchhead(git_remote *remote, git_refspec *spec, git
 			goto cleanup;
 	}
 
+	if (gitno_remove_url_userinfo(&url, git_remote_url(remote)) < 0)
+		goto cleanup;
+
 	/* Create the FETCH_HEAD file */
 	git_vector_foreach(update_heads, i, remote_ref) {
 		int merge_this_fetchhead = (merge_remote_ref == remote_ref);
@@ -981,8 +985,9 @@ static int git_remote_write_fetchhead(git_remote *remote, git_refspec *spec, git
 			&remote_ref->oid,
 			merge_this_fetchhead,
 			remote_ref->name,
-			git_remote_url(remote)) < 0)
+			url) < 0) {
 			goto cleanup;
+		}
 
 		if (git_vector_insert(&fetchhead_refs, fetchhead_ref) < 0)
 			goto cleanup;
@@ -996,6 +1001,7 @@ cleanup:
 
 	git_vector_free(&fetchhead_refs);
 	git_reference_free(head_ref);
+	git__free(url);
 
 	return error;
 }

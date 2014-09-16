@@ -680,6 +680,79 @@ static char* unescape(char *str)
 	return str;
 }
 
+static int git_ssh_extract_url_parts(
+	char **host,
+	char **username,
+	char **path,
+	const char *url)
+{
+	const char *colon, *at;
+	const char *start;
+
+	colon = strchr(url, ':');
+
+	at = strchr(url, '@');
+	if (at) {
+		start = at + 1;
+		*username = git__substrdup(url, at - url);
+		if (!*username) {
+			giterr_set_oom();
+			return -1;
+		}
+	} else {
+		start = url;
+		*username = NULL;
+	}
+
+	if (colon == NULL || (colon < start)) {
+		giterr_set(GITERR_NET, "Malformed URL");
+		return -1;
+	}
+
+	*host = git__substrdup(start, colon - start);
+	if (!*host) {
+		giterr_set_oom();
+		return -1;
+	}
+
+	*path = git__strdup(colon + 1);
+	if (!*path) {
+		giterr_set_oom();
+		return -1;
+	}
+
+	return 0;
+}
+
+int gitno_remove_url_userinfo(char **url_no_user, const char *url) {
+	struct http_parser_url u = {0};
+
+	if (http_parser_parse_url(url, strlen(url), false, &u)) {
+		char *host, *username = NULL, *path;
+		if (git_ssh_extract_url_parts(&host, &username, &path, url)) {
+			giterr_set(GITERR_NET, "Malformed URL '%s'", url);
+			return GIT_EINVALIDSPEC;
+		}
+
+		*url_no_user = git__strdup(url);
+		GITERR_CHECK_ALLOC(*url_no_user);
+		if (username) {
+			sprintf(*url_no_user, "%s:%s", host, path);
+			git__free(username);
+		}
+		git__free(host);
+		git__free(path);
+		return 0;
+	}
+
+	*url_no_user = git__strdup(url);
+	GITERR_CHECK_ALLOC(*url_no_user);
+	if (u.field_set & (1 << UF_USERINFO))
+		strcpy(*url_no_user + u.field_data[UF_USERINFO].off, url + u.field_data[UF_HOST].off);
+
+	return 0;
+}
+
 int gitno_extract_url_parts(
 		char **host,
 		char **port,

@@ -97,6 +97,8 @@ int gitno_connection_data_from_url(
 /* This frees all the pointers IN the struct, but not the struct itself. */
 void gitno_connection_data_free_ptrs(gitno_connection_data *data);
 
+int gitno_remove_url_userinfo(char **url_no_user, const char *url);
+
 int gitno_extract_url_parts(
 		char **host,
 		char **port,
