@@ -4,6 +4,7 @@
 #include "fetchhead.h"
 #include "../fetchhead/fetchhead_data.h"
 #include "git2/clone.h"
+#include <libssh2.h>
 
 #define LIVE_REPO_URL "git://github.com/libgit2/TestGitRepository"
 
@@ -100,4 +101,141 @@ void test_online_fetchhead__no_merges(void)
 	fetchhead_test_fetch(NULL, FETCH_HEAD_NO_MERGE_DATA);
 	cl_git_pass(git_tag_delete(g_repo, "commit_tree"));
 	fetchhead_test_fetch(NULL, FETCH_HEAD_NO_MERGE_DATA3);
+}
+
+static int read_fetchhead(const char *ref_name, const char *remote_url,
+	const git_oid *oid, unsigned int is_merge, void *payload)
+{
+	const char *expected = (const char *)payload;
+	GIT_UNUSED(ref_name);
+	GIT_UNUSED(oid);
+	GIT_UNUSED(is_merge);
+	GIT_UNUSED(payload);
+
+	cl_git_pass(strcmp(remote_url, expected));
+	return 0;
+}
+
+static void cred_ssh_interactive_cb(const char* name, int name_len, const char* instruction, int instruction_len, int num_prompts, const LIBSSH2_USERAUTH_KBDINT_PROMPT* prompts, LIBSSH2_USERAUTH_KBDINT_RESPONSE* responses, void **abstract)
+{
+	const char *remote_ssh_passphrase = cl_getenv("GITTEST_REMOTE_SSH_PASSPHRASE");
+	responses->text = remote_ssh_passphrase;
+	responses->length = strlen(remote_ssh_passphrase);
+}
+
+static int cred_acquire_cb(git_cred **cred,
+		const char * url,
+		const char * username_from_url,
+		unsigned int allowed_types,
+		void * payload)
+{
+	const char *remote_user = cl_getenv("GITTEST_REMOTE_USER");
+	const char *remote_pass = cl_getenv("GITTEST_REMOTE_PASS");
+	const char *remote_ssh_key = cl_getenv("GITTEST_REMOTE_SSH_KEY");
+	const char *remote_ssh_pubkey = cl_getenv("GITTEST_REMOTE_SSH_PUBKEY");
+	const char *remote_ssh_passphrase = cl_getenv("GITTEST_REMOTE_SSH_PASSPHRASE");
+	const char *remote_default = cl_getenv("GITTEST_REMOTE_DEFAULT");
+
+	GIT_UNUSED(url);
+	GIT_UNUSED(username_from_url);
+	GIT_UNUSED(payload);
+
+	if (GIT_CREDTYPE_USERNAME & allowed_types) {
+		if (!remote_user) {
+			printf("GITTEST_REMOTE_USER must be set\n");
+			return -1;
+		}
+
+		return git_cred_username_new(cred, remote_user);
+	}
+
+	if (GIT_CREDTYPE_DEFAULT & allowed_types) {
+		if (!remote_default) {
+			printf("GITTEST_REMOTE_DEFAULT must be set to use NTLM/Negotiate credentials\n");
+			return -1;
+		}
+
+		return git_cred_default_new(cred);
+	}
+
+	if (GIT_CREDTYPE_SSH_INTERACTIVE & allowed_types) {
+		if (!remote_user || !remote_ssh_passphrase) {
+			printf("GITTEST_REMOTE_USER, and GITTEST_REMOTE_SSH_PASSPHRASE must be set\n");
+			return -1;
+		}
+
+		printf("git_cred_ssh_interactive_new\n");
+		return git_cred_ssh_interactive_new(cred, remote_user, cred_ssh_interactive_cb, NULL);
+	}
+
+	if (GIT_CREDTYPE_SSH_KEY & allowed_types) {
+		if (!remote_user || !remote_ssh_pubkey || !remote_ssh_key || !remote_ssh_passphrase) {
+			printf("GITTEST_REMOTE_USER, GITTEST_REMOTE_SSH_PUBKEY, GITTEST_REMOTE_SSH_KEY and GITTEST_REMOTE_SSH_PASSPHRASE must be set\n");
+			return -1;
+		}
+
+		printf("%s\n", remote_user);
+		printf("%s\n", remote_ssh_pubkey);
+		printf("%s\n", remote_ssh_key);
+		printf("%s\n", remote_ssh_passphrase);
+		return git_cred_ssh_key_new(cred, remote_user, remote_ssh_pubkey, remote_ssh_key, remote_ssh_passphrase);
+	}
+
+	if (GIT_CREDTYPE_USERPASS_PLAINTEXT & allowed_types) {
+		if (!remote_user || !remote_pass) {
+			printf("GITTEST_REMOTE_USER and GITTEST_REMOTE_PASS must be set\n");
+			return -1;
+		}
+
+		return git_cred_userpass_plaintext_new(cred, remote_user, remote_pass);
+	}
+
+	return -1;
+}
+
+void test_online_fetchhead__url_userinfo(void)
+{
+	git_remote *remote;
+	git_buf full_url = GIT_BUF_INIT;
+	git_buf url_no_user = GIT_BUF_INIT;
+	git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+	const char *remote_url_scheme = cl_getenv("GITTEST_REMOTE_URL_SCHEME");
+	const char *remote_url_host = cl_getenv("GITTEST_REMOTE_URL_HOST");
+	const char *remote_url_port = cl_getenv("GITTEST_REMOTE_URL_PORT");
+	const char *remote_url_path = cl_getenv("GITTEST_REMOTE_URL_PATH");
+	const char *remote_user = cl_getenv("GITTEST_REMOTE_USER");
+	const char *remote_pass = cl_getenv("GITTEST_REMOTE_PASS");
+
+	if (!remote_url_host || !remote_url_path || !remote_user)
+		clar__skip();
+
+	if (remote_url_scheme) {
+		git_buf_printf(&full_url, "%s://%s%s%s@%s%s%s%s",
+			remote_url_scheme, remote_user,
+			remote_pass ? ":" : "", remote_pass ? remote_pass : "",
+			remote_url_host,
+			remote_url_port ? ":" : "",	remote_url_port ? remote_url_port : "",
+			remote_url_path);
+		git_buf_printf(&url_no_user, "%s://%s%s%s%s",
+			remote_url_scheme, remote_url_host,
+			remote_url_port ? ":" : "",	remote_url_port ? remote_url_port : "",
+			remote_url_path);
+	} else {
+		git_buf_printf(&full_url, "%s@%s%s%s:%s",
+			remote_user, remote_url_host,
+			remote_url_port ? ":" : "", remote_url_port, remote_url_path);
+		git_buf_printf(&url_no_user, "%s%s%s:%s",
+			remote_url_host, remote_url_port ? ":" : "", remote_url_port, remote_url_path);
+	}
+	cl_git_pass(git_repository_init(&g_repo, "./fetch", 0));
+
+	cl_git_pass(git_remote_create_anonymous(&remote, g_repo, git_buf_cstr(&full_url), NULL));
+	callbacks.credentials = cred_acquire_cb;
+	git_remote_set_callbacks(remote, &callbacks);
+	cl_git_pass(git_remote_connect(remote, GIT_DIRECTION_FETCH));
+	cl_git_pass(git_remote_download(remote));
+	cl_git_pass(git_remote_update_tips(remote, NULL, NULL));
+	git_remote_disconnect(remote);
+	git_remote_free(remote);
+	cl_git_pass(git_repository_fetchhead_foreach(g_repo, read_fetchhead, (void *)git_buf_cstr(&url_no_user)));
 }
